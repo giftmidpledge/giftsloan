@@ -1846,59 +1846,7 @@
     clearTimeout(catRerenderTimer);
     catRerenderTimer = setTimeout(renderCatalogResults, 150);
   }
-  window.catShowMore = function () {
-    var cur = (_get('cat-col') && _get('cat-col').value) || '';
-    if (cur && CAT_REAL.f) { catRealFetch(CAT_REAL.f, 'more'); return; }
-    CAT_SHOWN += CAT_PAGE; renderCatalogResults();
-  };
-
-  // ---- реальные подарки коллекции (с номерами) с оракула ----
-  var CAT_REAL = { sig: '', f: null, items: [], total: 0, crawled: 0, supply: 0, complete: false, err: false, errMsg: '', loading: false, gen: 0, retries: 0 };
-  var catRealTimer = null;
-  function catRealQuery(f, offset, limit) {
-    var qs = 'gift=' + catEnc(f.col) + (f.model ? '&model=' + catEnc(f.model) : '') +
-      (f.backdrop ? '&backdrop=' + catEnc(f.backdrop) : '') + (f.pattern ? '&symbol=' + catEnc(f.pattern) : '');
-    if (f.q) qs += /^\d+$/.test(f.q) ? '&num=' + f.q : '&q=' + catEnc(f.q);
-    return qs + '&offset=' + offset + '&limit=' + limit;
-  }
-  // mode: 'new' — новый набор фильтров, 'more' — следующая страница, 'poll' — обновить (индекс на сервере дособирается)
-  function catRealFetch(f, mode) {
-    clearTimeout(catRealTimer);
-    if (mode === 'new_keep') { CAT_REAL.items = []; mode = 'poll'; }
-    if (mode === 'new') {
-      CAT_REAL = { sig: [f.col, f.model, f.backdrop, f.pattern, f.q].join('|'), f: f, items: [], total: 0, crawled: 0, supply: 0,
-                   complete: false, err: false, errMsg: '', loading: true, gen: CAT_REAL.gen + 1, retries: 0 };
-    }
-    var R = CAT_REAL, gen = R.gen;
-    R.loading = true;
-    var offset = mode === 'more' ? R.items.length : 0;
-    var limit = mode === 'poll' ? Math.min(300, Math.max(60, R.items.length)) : 60;
-    catFetchTimeout(CAT_ORACLE + '/gift-list?' + catRealQuery(f, offset, limit), {}, 30000)
-      .then(function (r) { return r.json().then(function (j) { return { r: r, j: j }; }, function () { return { r: r, j: null }; }); })
-      .then(function (x) {
-        if (CAT_REAL.gen !== gen) return;
-        if (!x.r.ok || !x.j || !x.j.ok) { var er = new Error((x.j && x.j.error) || ('HTTP ' + x.r.status)); er.fatal = !!(x.j && x.j.error); throw er; }
-        R.items = mode === 'more' ? R.items.concat(x.j.items) : x.j.items;
-        R.total = x.j.total; R.crawled = x.j.crawled; R.supply = x.j.supply; R.complete = x.j.complete;
-        R.unknown = x.j.unknown || null; R.have = x.j.have || null;
-        R.err = false; R.errMsg = '';
-      })
-      .catch(function (e) {
-        if (CAT_REAL.gen !== gen) return;
-        console.warn('[GiftPledge] gift-list', e);
-        R.err = true; R.errMsg = String(e.message || e); R.fatal = !!e.fatal;
-      })
-      .then(function () {
-        if (CAT_REAL.gen !== gen) return;
-        R.loading = false;
-        renderCatalogResults();
-        var again = (!R.err && !R.complete) || (R.err && !R.fatal && R.retries++ < 4);   // сервер просыпается или дособирает индекс
-        if (again) catRealTimer = setTimeout(function () {
-          var cur = (_get('cat-col') && _get('cat-col').value) || '';
-          if (CAT_REAL.gen === gen && cur === f.col) catRealFetch(f, R.err ? 'new_keep' : 'poll');
-        }, R.err ? 8000 : 6000);
-      });
-  }
+  window.catShowMore = function () { /* Виртуальный каталог, пагинация не нужна */ };
 
   function renderCatalogResults() {
     var grid = _get('catalog-grid');
@@ -1914,33 +1862,76 @@
     catSyncPickers();
 
     var moreBtn = _get('catalog-more');
-    // Выбрана коллекция — РЕАЛЬНЫЕ подарки с номерами (индекс на оракуле, GET /gift-list), с учётом фильтров
-    if (col) {
-      var attrs = CAT_ATTR_CACHE[col] || CAT_ATTR_LAST[col];
-      if (!attrs) {
-        if (cnt) cnt.textContent = 'Загрузка…';
+ 
+      if (moreBtn) moreBtn.style.display = 'none';
+
+    // Если коллекция не выбрана, показываем список коллекций
+    if (!col) {
+      var list = CAT_GIFTS.slice();
+      if (q) list = list.filter(function (n) { return n.toLowerCase().indexOf(q) !== -1; });
+      if (cnt) cnt.textContent = list.length + ' коллекций';
+      if (!list.length) {
+        grid.innerHTML = ''; grid.style.display = 'none';
+        if (empty) empty.style.display = '';
         return;
       }
-      var floor = catFloorOf(col);
-      var rsig = [col, model, backdrop, pattern, q].join('|');
-      if (rsig !== CAT_REAL.sig) catRealFetch({ col: col, model: model, backdrop: backdrop, pattern: pattern, q: q }, 'new');
-      var R = CAT_REAL, items = R.items;
-      if (cnt) {
-        if (R.err && !items.length) cnt.textContent = 'Не удалось загрузить';
-        else if (R.loading && !items.length) cnt.textContent = 'Загрузка…';
-        else cnt.textContent = R.total + ' подарков · ' + col + ((R.complete || !R.supply) ? '' : ' · проиндексировано ' + R.crawled + ' из ' + R.supply);
-      }
-      if (!items.length) {
-        grid.innerHTML = '';
-        grid.style.display = 'none';
-        if (moreBtn) moreBtn.style.display = 'none';
-        catSetEmptyText(R.err ? 'Не удалось загрузить список подарков (' + (R.errMsg || 'сервер недоступен') + '). Пробуем ещё раз…'
-          : R.unknown && R.complete ? 'В индексе Fragment нет значения «' + (R.f ? (R.unknown[0] === 'model' ? R.f.model : R.unknown[0] === 'backdrop' ? R.f.backdrop : R.f.pattern) : '') + '». Названия в индексе: ' + (((R.have || {})[R.unknown[0]] || []).slice(0, 25).join(', ') || '—')
-          : R.complete ? 'Подарков с такими параметрами нет'
-          : 'Индекс подарков ещё собирается (' + R.crawled + ' из ' + (R.supply || '…') + '), список появится сам');
-        if (empty) empty.style.display = R.loading ? 'none' : '';
-        return;
-      }
+      if (empty) empty.style.display = 'none';
+      grid.style.display = 'grid';
+      grid.innerHTML = list.map(function (n) {
+        var fl = catFloorOf(n);
+        return '<div class="catalog-card" onclick="selectCatalogCollection(' + catArg(n) + ')">' +
+          '<div class="c-name">' + escapeHtml(n) + '</div>' +
+          (fl ? '<div class="c-floor">' + escapeHtml(catPriceTxt(fl)) + '</div>' : '<div class="c-sub">нажми — модели и фильтры</div>') +
+          '</div>';
+      }).join('');
+      return;
+    }
+
+    // Если коллекция выбрана, но атрибуты еще не загрузились
+    var attrs = CAT_ATTR_CACHE[col];
+    if (!attrs) {
+      if (cnt) cnt.textContent = 'Загрузка атрибутов…';
+      grid.innerHTML = ''; grid.style.display = 'none';
+      if (empty) empty.style.display = 'none';
+      return;
+    }
+
+    // Строим виртуальные комбинации
+    var f = { col: col, model: model, backdrop: backdrop, pattern: pattern, q: q };
+    var combos = catCombos(attrs, f);
+    var limit = 60;
+    var hasMore = combos.length > limit;
+    var shown = combos.slice(0, limit);
+
+    if (cnt) cnt.textContent = combos.length + ' комбинаций' + (hasMore ? ' (показаны первые ' + limit + ')' : '');
+    
+    if (!combos.length) {
+      grid.innerHTML = ''; grid.style.display = 'none';
+      if (empty) empty.style.display = '';
+      return;
+    }
+
+    if (empty) empty.style.display = 'none';
+    grid.style.display = 'grid';
+    var floor = catFloorOf(col);
+
+    grid.innerHTML = shown.map(function (c) {
+      var m = c.m, bd = c.bd, sym = c.sym;
+      var own = m.price;
+      var price = own || floor;
+      
+      return '<div class="catalog-card" onclick="openCatDetail(' +
+        catArg(col) + ',' + catArg(m.name) + ',' + catArg(bd ? bd.name : '') + ',' + catArg(sym ? sym.name : '') + ', 0)">' +
+        catArtHtml(col, m, bd, sym) +
+        '<div class="c-name">' + escapeHtml(col) + '</div>' +
+        '<div class="c-sub">' + escapeHtml(m.name) + '</div>' +
+        (bd ? catAttrLine('Фон', bd) : '') +
+        (sym ? catAttrLine('Узор', sym) : '') +
+        (price ? '<div class="c-floor">' + escapeHtml(catPriceTxt(price)) +
+          (own ? '' : ' <span class="c-floor-note">floor</span>') + '</div>' : '') +
+        '</div>';
+    }).join('');
+  }
       catSetEmptyText();
       if (empty) empty.style.display = 'none';
       grid.style.display = 'grid';
