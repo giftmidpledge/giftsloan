@@ -4407,21 +4407,18 @@ async function checkOwner() {
 
 <script>
 (function () {
-  var _rg = null;
   function install() {
-    if (typeof renderGifts !== 'function') { setTimeout(install, 50); return; }
-    if (renderGifts.__noDemo) return;
-    var orig = renderGifts;
+    if (typeof window.renderGifts !== 'function') { setTimeout(install, 50); return; }
+    if (window.renderGifts.__noDemo) return;
+    var orig = window.renderGifts;
     window.renderGifts = function () {
-      if (window.gifts && gifts.length) {
-        gifts = gifts.filter(function (g) { return g && g.address && !String(g.address).startsWith('demo'); });
+      if (window.gifts && window.gifts.length) {
+        window.gifts = window.gifts.filter(function (g) { return g && g.address && !String(g.address).startsWith('demo'); });
       }
       return orig.apply(this, arguments);
     };
-    renderGifts.__noDemo = true;
+    window.renderGifts.__noDemo = true;
   }
   install();
 })();
 </script>
-
-</body></html>
