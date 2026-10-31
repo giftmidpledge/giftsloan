@@ -353,22 +353,19 @@ function startServer(key) {
       return send(200, { collections: floorsList, updatedAt: floorsAt });
     }
     
-    if (req.method === 'GET' && req.url.startsWith('/gift-list')) {
-      if (rateLimited('l' + ip, 120)) return send(429, { error: 'too many requests' });
+    if (req.method === 'GET' && req.url.startsWith('/gift-attrs')) {
+      if (rateLimited('a' + ip, 120)) return send(429, { error: 'too many requests' });
       try {
         const q = Object.fromEntries(new URL(req.url, 'http://x').searchParams);
-        const out = await giftFinder.list(q);
-        return send(out.ok ? 200 : 404, out);
-      } catch (e) { console.error('gift-list:', e.message); return send(500, { error: 'gift-list failed' }); }
-    }
-
-    if (req.method === 'GET' && req.url.startsWith('/gift-find')) {
-      if (rateLimited('g' + ip, 60)) return send(429, { error: 'too many requests' });
-      try {
-        const q = Object.fromEntries(new URL(req.url, 'http://x').searchParams);
-        const out = await giftFinder.find(q);
-        return send(out.ok ? 200 : 404, out);
-      } catch (e) { console.error('gift-find:', e.message); return send(500, { error: 'gift-find failed' }); }
+        const gift = q.gift;
+        if (!gift) return send(400, { error: 'gift parameter required' });
+        
+        const attrs = await giftFinder.getAttributes(gift);
+        return send(200, { ok: true, gift, ...attrs });
+      } catch (e) {
+        console.error('gift-attrs:', e.message);
+        return send(500, { error: 'gift-attrs failed' });
+      }
     }
 
     if (req.method === 'GET' && req.url === '/status') {
