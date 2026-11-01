@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 // ====== НАСТРОЙКИ ======
-const POOL_ADDRESS = process.env.POOL_ADDRESS || 'EQA1_3bfycnsCmtrmOA6ig6grVX4leWzC7waOmzi4QrUSLZP';
+const POOL_ADDRESS = process.env.POOL_ADDRESS || 'EQCy1dducvQOxIXgU4ZxkMMzkrEzu3nLr-j_pCwTV42bVEyH';
 const PORT = Number(process.env.PORT || 10000);
 const MAX_LOAN_NANO = BigInt(Math.round(Number(process.env.MAX_LOAN_GRAM || '100000') * 1e9));
 const FLOOR_DISCOUNT_BPS = 9000n;   
