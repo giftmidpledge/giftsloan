@@ -1,5 +1,5 @@
 import { Address, beginCell, storeStateInit } from '@ton/core';
-import { LoanEscrow } from './giftloan_loanEscrow.ts';
+import { LoanEscrow } from './giftloan_loanEscrow.js';
 
 async function main() {
     const poolRaw = process.argv[2];
