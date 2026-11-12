@@ -1,5 +1,3 @@
-// Оракул GiftLoan v3 (контракт GiftLoan v11.38: Pool + Escrow на пару NFT+operationId, 3 подписи).
-// Ключи/секреты ТОЛЬКО в Render Environment, не в репозитории.
 import http from 'node:http';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
